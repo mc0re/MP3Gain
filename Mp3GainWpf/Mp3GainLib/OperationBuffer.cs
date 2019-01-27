@@ -1,8 +1,6 @@
-﻿using System;
-
-namespace Mp3GainLib
+﻿namespace Mp3GainLib
 {
-    public class Operation
+    public class OperationBuffer
     {
         #region Properties
 
@@ -28,11 +26,11 @@ namespace Mp3GainLib
 
         #region Init and clean-up
 
-        public Operation(int size)
+        public OperationBuffer(int size, int historySize)
         {
-            Input = new HistoricalArray(0);
-            Filtered = new HistoricalArray(size);
-            Output = new HistoricalArray(size);
+            Input = new HistoricalArray(0, historySize);
+            Filtered = new HistoricalArray(size, historySize);
+            Output = new HistoricalArray(size, historySize);
         }
 
         #endregion

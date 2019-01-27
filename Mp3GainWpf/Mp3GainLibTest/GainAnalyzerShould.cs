@@ -37,13 +37,12 @@ namespace Mp3GainLibTest
 
 
         [TestMethod]
-        public void AnalyzeOneWindowOfWhiteNoise()
+        public void AnalyzeOneWindowOfSilence()
         {
             var analyzer = new GainAnalyzer(8000);
-            var rnd = new Random();
 
             var res = analyzer.AnalyzeSamples(
-                Enumerable.Range(0, 400).Select(a => rnd.NextDouble()).ToArray(), null);
+                Enumerable.Range(0, 400).Select(a => 0.9).ToArray(), null);
             Assert.AreEqual(AnalyzerResults.Ok, res);
 
             var gain = analyzer.GetTitleGain();
@@ -52,13 +51,12 @@ namespace Mp3GainLibTest
 
 
         [TestMethod]
-        public void AnalyzeLargeWindowOfWhiteNoise()
+        public void AnalyzeLargeWindowOfSilence()
         {
             var analyzer = new GainAnalyzer(8000);
-            var rnd = new Random();
 
             var res = analyzer.AnalyzeSamples(
-                Enumerable.Range(0, 40000).Select(a => rnd.NextDouble()).ToArray(), null);
+                Enumerable.Range(0, 40000).Select(a => 0.0).ToArray(), null);
             Assert.AreEqual(AnalyzerResults.Ok, res);
 
             var gain = analyzer.GetTitleGain();
@@ -67,15 +65,14 @@ namespace Mp3GainLibTest
 
 
         [TestMethod]
-        public void AnalyzeFewWindowsOfWhiteNoise()
+        public void AnalyzeFewWindowsOfSilence()
         {
             var analyzer = new GainAnalyzer(8000);
-            var rnd = new Random();
 
             for (var i = 0; i < 10; i++)
             {
                 var res = analyzer.AnalyzeSamples(
-                    Enumerable.Range(0, 400).Select(a => rnd.NextDouble()).ToArray(), null);
+                    Enumerable.Range(0, 400).Select(a => 0.0).ToArray(), null);
                 Assert.AreEqual(AnalyzerResults.Ok, res);
             }
 
@@ -85,20 +82,31 @@ namespace Mp3GainLibTest
 
 
         [TestMethod]
-        public void AnalyzeReducedNoise()
+        public void AnalyzeMaxVolume()
+        {
+            var analyzer = new GainAnalyzer(8000);
+
+            var res = analyzer.AnalyzeSamples(
+                Enumerable.Range(0, 400).Select(a => 32767.0).ToArray(), null);
+            Assert.AreEqual(AnalyzerResults.Ok, res);
+
+            var gain = analyzer.GetTitleGain();
+            Assert.AreEqual(2.82, gain, 0.00001);
+        }
+
+
+        [TestMethod]
+        public void AnalyzeWhiteNoise()
         {
             var analyzer = new GainAnalyzer(8000);
             var rnd = new Random();
 
-            for (var i = 0; i < 10; i++)
-            {
-                var res = analyzer.AnalyzeSamples(
-                    Enumerable.Range(0, 400).Select(a => rnd.NextDouble() * 9093).ToArray(), null);
-                Assert.AreEqual(AnalyzerResults.Ok, res);
-            }
+            var res = analyzer.AnalyzeSamples(
+                Enumerable.Range(0, 1000).Select(a => (double) rnd.Next(-32768, 32767)).ToArray(), null);
+            Assert.AreEqual(AnalyzerResults.Ok, res);
 
             var gain = analyzer.GetTitleGain();
-            Assert.AreEqual(0.82, gain, 0.00001);
+            Assert.AreEqual(-16.18, gain, 0.01);
         }
     }
 }

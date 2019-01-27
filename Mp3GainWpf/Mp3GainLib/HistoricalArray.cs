@@ -15,7 +15,7 @@ namespace Mp3GainLib
         /// <summary>
         /// If any data is needed before the start of the buffer or after its end, it's 0.
         /// </summary>
-        protected double[] mData;
+        private double[] mData;
 
 
         /// <summary>
@@ -27,13 +27,13 @@ namespace Mp3GainLib
         /// <summary>
         /// Historical data.
         /// </summary>
-        private List<double> mPrevious;
+        private readonly double[] mPreviousData;
 
 
         /// <summary>
         /// Length of historical data (optimization).
         /// </summary>
-        private int mPreviousLength;
+        private readonly int mPreviousLength;
 
         #endregion
 
@@ -45,7 +45,7 @@ namespace Mp3GainLib
             get
             {
                 if (index < 0 && index >= -mPreviousLength)
-                    return mPrevious[mPreviousLength + index];
+                    return mPreviousData[mPreviousLength + index];
                 else if (index >= 0 && index < mDataLength)
                     return mData[index];
                 else
@@ -69,17 +69,18 @@ namespace Mp3GainLib
 
         #region Init and clean-up
 
-        public HistoricalArray(int size)
+        public HistoricalArray(int dataSize, int historySize) :
+            this(new double[dataSize], historySize)
         {
-            mData = new double[size];
-            mDataLength = size;
         }
 
 
-        public HistoricalArray(double[] data)
+        public HistoricalArray(double[] data, int historySize)
         {
             mData = data;
             mDataLength = data.Length;
+            mPreviousData = new double[historySize];
+            mPreviousLength = historySize;
         }
 
         #endregion
@@ -97,10 +98,18 @@ namespace Mp3GainLib
         /// <summary>
         /// Pack up part of the current data as historical data.
         /// </summary>
-        public void Shift(int start, int size)
+        public void Shift(int start)
         {
-            mPrevious = mData.Skip(start).Take(size).ToList();
-            mPreviousLength = size;
+            if (start >= 0)
+            {
+                Array.Copy(mData, start, mPreviousData, 0, mPreviousLength);
+            }
+            else
+            {
+                // We're only talking about a few samples, so a loop is okay
+                for (var i = 0; i < mPreviousLength; i++)
+                    mPreviousData[i] = this[start + i];
+            }
         }
 
         #endregion

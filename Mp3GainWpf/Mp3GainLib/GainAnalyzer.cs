@@ -16,37 +16,44 @@ namespace Mp3GainLib
 
         private const int YuleOrder = 10;
 
+        public static readonly int MaxOrder = Math.Max(ButterOrder, YuleOrder);
+
+        
         /// <summary>
         /// Time slice size [ms].
         /// </summary>
-        public const int RMS_WINDOW_TIME_MS = 50;
-
-        public const int MAX_SAMP_FREQ_KHZ = 96;
-
-        public static readonly int MaxOrder = Math.Max(ButterOrder, YuleOrder);
-
-        /// <summary>
-        /// Table entries per dB.
-        /// </summary>
-        private const int STEPS_per_dB = 100;
+        public const int RmsWindowSizeMs = 50;
 
 
         /// <summary>
-        /// Table entries for 0...MAX_dB (normal max. values are 70...80 dB).
+        /// Maximum allowed sampling frequency [KHz].
         /// </summary>
-        private const int MAX_dB = 120;
+        public const int MaxSamplingFrequencyKHz = 96;
 
 
         /// <summary>
-        /// Accepted percentile which is louder than the proposed level.
+        /// The number of histogram entries per dB.
         /// </summary>
-        private const double RMS_PERCENTILE = 0.95;
+        private const int MeasureStepsPerDb = 100;
+
+
+        /// <summary>
+        /// Histogram measures from 0 to MaxDb.
+        /// Normal values are 70...80 dB.
+        /// </summary>
+        private const int MaxDb = 120;
+
+
+        /// <summary>
+        /// Accepted percentile which is not louder than the proposed level.
+        /// </summary>
+        private const double PercentileNotLouder = 0.95;
 
 
         /// <summary>
         /// Calibration value (298640883795).
         /// </summary>
-        private const double PINK_REF = 64.82;
+        private const double PinkNoiseLevel = 64.82;
 
 
         private static readonly Dictionary<int, int> FrequencyIndices = new Dictionary<int, int>
@@ -120,9 +127,9 @@ namespace Mp3GainLib
 
         private int mAccumulatedSamples;
 
-        private Operation mLeft;
+        private OperationBuffer mLeft;
 
-        private Operation mRight;
+        private OperationBuffer mRight;
 
         private double mLeftSumSq;
 
@@ -132,8 +139,8 @@ namespace Mp3GainLib
         /// <summary>
         /// Histogram of volumes.
         /// </summary>
-        private int[] SongVolumes = new int[STEPS_per_dB * MAX_dB];
-        private int[] AlbumVolumes = new int[STEPS_per_dB * MAX_dB];
+        private int[] SongVolumes = new int[MeasureStepsPerDb * MaxDb];
+        private int[] AlbumVolumes = new int[MeasureStepsPerDb * MaxDb];
 
         #endregion
 
@@ -207,7 +214,7 @@ namespace Mp3GainLib
                 if (mAccumulatedSamples == mSamplesInWindow)
                 {
                     // Get the Root Mean Square (RMS) for this set of samples
-                    double val = STEPS_per_dB * 10.0 * Math.Log10((mLeftSumSq + mRightSumSq) / mAccumulatedSamples * 0.5 + 1e-37);
+                    double val = MeasureStepsPerDb * 10.0 * Math.Log10((mLeftSumSq + mRightSumSq) / mAccumulatedSamples * 0.5 + 1e-37);
                     int ival = Math.Max((int) val, 0);
                     ival = Math.Min(ival, SongVolumes.Length - 1);
                     SongVolumes[ival]++;
@@ -215,16 +222,16 @@ namespace Mp3GainLib
                     // Restart the measurements
                     mLeftSumSq = 0;
                     mRightSumSq = 0;
-                    mLeft.Filtered.Shift(mAccumulatedSamples, MaxOrder);
-                    mRight.Filtered.Shift(mAccumulatedSamples, MaxOrder);
-                    mLeft.Output.Shift(mAccumulatedSamples, MaxOrder);
-                    mRight.Output.Shift(mAccumulatedSamples, MaxOrder);
+                    mLeft.Filtered.Shift(mAccumulatedSamples - MaxOrder);
+                    mRight.Filtered.Shift(mAccumulatedSamples - MaxOrder);
+                    mLeft.Output.Shift(mAccumulatedSamples - MaxOrder);
+                    mRight.Output.Shift(mAccumulatedSamples - MaxOrder);
                     mAccumulatedSamples = 0;
                 }
             }
 
-            mLeft.Input.Shift(batchSamples - MaxOrder, MaxOrder);
-            mRight.Input.Shift(batchSamples - MaxOrder, MaxOrder);
+            mLeft.Input.Shift(batchSamples - MaxOrder);
+            mRight.Input.Shift(batchSamples - MaxOrder);
 
             return AnalyzerResults.Ok;
         }
@@ -267,12 +274,12 @@ namespace Mp3GainLib
             if (!FrequencyIndices.TryGetValue(sampleFrequency, out mFrequencyIndex))
                 return AnalyzerResults.Error;
 
-            mSamplesInWindow = (int) Math.Ceiling(sampleFrequency / 1000.0 * RMS_WINDOW_TIME_MS);
+            mSamplesInWindow = (int) Math.Ceiling(sampleFrequency / 1000.0 * RmsWindowSizeMs);
 
             // Max samples per time slice
-            var maxSamplesPerWindow = MAX_SAMP_FREQ_KHZ * RMS_WINDOW_TIME_MS + 1;
-            mLeft = new Operation(maxSamplesPerWindow);
-            mRight = new Operation(maxSamplesPerWindow);
+            var maxSamplesPerWindow = MaxSamplingFrequencyKHz * RmsWindowSizeMs + 1;
+            mLeft = new OperationBuffer(maxSamplesPerWindow, MaxOrder);
+            mRight = new OperationBuffer(maxSamplesPerWindow, MaxOrder);
 
             return AnalyzerResults.Ok;
         }
@@ -370,7 +377,7 @@ namespace Mp3GainLib
                 return AnalyzerResults.Error;
             }
 
-            var upper = (int) Math.Ceiling(sum * (1.0 - RMS_PERCENTILE));
+            var upper = (int) Math.Ceiling(sum * (1.0 - PercentileNotLouder));
 
             int i;
             for (i = Array.Length; i-- > 0;)
@@ -379,7 +386,7 @@ namespace Mp3GainLib
                     break;
             }
 
-            gain = PINK_REF - i / STEPS_per_dB;
+            gain = PinkNoiseLevel - i / MeasureStepsPerDb;
 
             return AnalyzerResults.Ok;
         }
