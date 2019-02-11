@@ -28,44 +28,35 @@ namespace Mp3GainLib
         #endregion
 
 
-        public static bool Find(Stream file)
-        {
-            throw new NotImplementedException();
-        }
-
+        #region API
 
         /// <summary>
         /// Id3v2 tags start with "ID3" at the current position.
         /// </summary>
-        /// <param name="file"></param>
-        /// <returns>null if the tags were not found</returns>
-        public static GainTags ReadTags(Stream file)
+        /// <param name="strm">Input stream</param>
+        /// <returns>Whether the tags were found</returns>
+        public static bool ReadTags(Stream strm, out GainTags tags)
         {
-            var res = ReadTagsHeader(file);
-            if (res is null)
-                return null;
-
-            return res;
+            tags = ReadTagsHeader(strm);
+            return tags != null;
         }
 
-        
+        #endregion
+
+
+        #region Utility
+
         /// <summary>
         /// Id3v2 tags start with "ID3" at the current position.
         /// </summary>
-        /// <param name="file"></param>
+        /// <param name="strm"></param>
         /// <returns>null if the tags were not found</returns>
-        private static GainTags ReadTagsHeader(Stream file)
+        private static GainTags ReadTagsHeader(Stream strm)
         {
-            var hdr = new byte[HeaderSize];
-            if (file.Read(hdr, 0, HeaderSize) != HeaderSize)
+            var hdr = GetHeader(strm);
+            if (hdr is null)
             {
-                // Not enough data
-                return null;
-            }
-
-            if (Encoding.ASCII.GetString(hdr, 0, Magic.Length) != Magic)
-            {
-                // Wrong magic bytes, not ID3v2
+                // ID3 not found
                 return null;
             }
 
@@ -92,17 +83,43 @@ namespace Mp3GainLib
 
             var dlen = GetInt7bit(hdr.Skip(6));
             if (dlen == WrongInteger)
-                return null;
-
-            var res = new GainTags
             {
-                Type = TagTypes.Id3v2,
-                Version = (versionMinor << 8) + hdr[4],
-                BlockOffset = file.Position - HeaderSize,
-                BlockLength = 10 + dlen + (flags.HasFlag(Id3v2Flags.Footer) ? 10 : 0)
-            };
+                // Malformatted length
+                return null;
+            }
 
-            return res;
+            var blockLen = HeaderSize + dlen + (flags.HasFlag(Id3v2Flags.Footer) ? HeaderSize : 0);
+            var raw = new byte[blockLen];
+
+            strm.Seek(-HeaderSize, SeekOrigin.Current);
+            if (strm.Read(raw, 0, blockLen) != blockLen)
+            {
+                // Not enough data
+                return null;
+            }
+
+            return new GainTags(
+                TagTypes.Id3v2, (versionMinor << 8) + hdr[4],
+                strm.Position - HeaderSize, raw);
+        }
+
+
+        private static byte[] GetHeader(Stream strm)
+        {
+            var hdr = new byte[HeaderSize];
+            if (strm.Read(hdr, 0, HeaderSize) != HeaderSize)
+            {
+                // Not enough data
+                return null;
+            }
+
+            if (Encoding.ASCII.GetString(hdr, 0, Magic.Length) != Magic)
+            {
+                // Wrong magic bytes, not ID3v2
+                return null;
+            }
+
+            return hdr;
         }
 
 
@@ -117,5 +134,7 @@ namespace Mp3GainLib
 
             return (p[0] << 21) + (p[1] << 14) + (p[2] << 7) + p[3];
         }
+
+        #endregion
     }
 }

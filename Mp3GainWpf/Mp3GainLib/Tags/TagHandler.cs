@@ -1,27 +1,28 @@
-﻿using System.IO;
+﻿using System.Collections.Generic;
+using System.IO;
 
 
 namespace Mp3GainLib
 {
     public class TagHandler
     {
-        public static GainTags Read(Stream file)
+        public static IList<GainTags> Read(Stream file)
         {
-            var res = Id3v2.ReadTags(file);
+            var res = new List<GainTags>();
 
-            if (res is null && Id3v2.Find(file))
+            if (Id3v2.ReadTags(file, out var id3v2))
             {
-                res = Id3v2.ReadTags(file);
+                res.Add(id3v2);
             }
 
-            if (res is null && Id3v1.Find(file))
+            if (Id3v1.ReadTags(file, out var id3v1))
             {
-                res = Id3v1.ReadTags(file);
+                res.Add(id3v1);
             }
 
-            if (res is null && Apev2.Find(file))
+            if (Apev2.ReadTags(file, out var apev2))
             {
-                res = Apev2.ReadTags(file);
+                res.Add(apev2);
             }
 
             return res;
