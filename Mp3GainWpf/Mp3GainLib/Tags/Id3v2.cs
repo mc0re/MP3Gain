@@ -7,6 +7,10 @@ using System.Text;
 
 namespace Mp3GainLib
 {
+    /// <summary>
+    /// ID3 v2 tags are located in the beginning of the file.
+    /// We do not parse the tags, as there is no need for this.
+    /// </summary>
     public class Id3v2
     {
         #region Constants
@@ -53,6 +57,7 @@ namespace Mp3GainLib
         /// <returns>null if the tags were not found</returns>
         private static GainTags ReadTagsHeader(Stream strm)
         {
+            var offset = strm.Position;
             var hdr = GetHeader(strm);
             if (hdr is null)
             {
@@ -99,8 +104,7 @@ namespace Mp3GainLib
             }
 
             return new GainTags(
-                TagTypes.Id3v2, (versionMinor << 8) + hdr[4],
-                strm.Position - HeaderSize, raw);
+                TagTypes.Id3v2, (versionMinor << 8) + hdr[4], offset, raw);
         }
 
 

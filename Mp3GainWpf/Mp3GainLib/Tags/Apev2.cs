@@ -4,7 +4,7 @@ using System.IO;
 
 namespace Mp3GainLib
 {
-    internal class Apev2
+    public class ApeV2
     {
         public static bool ReadTags(Stream strm, out GainTags tags)
         {

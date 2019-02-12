@@ -20,7 +20,7 @@ namespace Mp3GainLib
                 res.Add(id3v1);
             }
 
-            if (Apev2.ReadTags(file, out var apev2))
+            if (ApeV2.ReadTags(file, out var apev2))
             {
                 res.Add(apev2);
             }
